@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>テキスト出力ツール</title>
+<style>
+  textarea {
+    width: 100%;
+    height: 80px;
+    margin-bottom: 20px;
+  }
+</style>
+</head>
+<body>
+
+<h1>テキスト出力ツール</h1>
+<button id="selectFolder">作業フォルダ選択</button>
+<div id="content"></div>
+
+<script>
+let dirHandle;
+const TEMPLATE_NAME = "template.txt";
+
+/* フォルダ選択 */
+document.getElementById("selectFolder").onclick = async () => {
+  dirHandle = await window.showDirectoryPicker();
+  checkTemplate();
+};
+
+/* テンプレート存在確認 */
+async function checkTemplate() {
+  try {
+    const handle = await dirHandle.getFileHandle(TEMPLATE_NAME);
+    const file = await handle.getFile();
+    const text = await file.text();
+    showOutputScreen(text);
+  } catch {
+    showTemplateCreator();
+  }
+}
+
+/* -----------------------------
+   テンプレート作成画面
+----------------------------- */
+function showTemplateCreator() {
+  document.getElementById("content").innerHTML = `
+    <h2>テンプレート作成</h2>
+
+    <label>出力ファイル名：
+      <input id="filename">
+    </label><br>
+
+    <label id="getDate">
+      <input type="button" id="addDate" onclick="date_math()" value="月日を先頭に付ける">
+    </label><br><br>
+
+    <h3>目次</h3>
+    <div id="toc-area">
+      <input type="text" name="toc" placeholder="目次">
+    </div>
+    <button onclick="addToc()">目次追加</button><br><br>
+
+    <button onclick="saveTemplate()">テンプレート保存</button>
+  `;
+  document.getElementById("selectFolder").style.display="none";
+}
+
+function addToc() {
+  const div = document.createElement("div");
+  div.innerHTML = `<input type="text" name="toc" placeholder="目次">`;
+  document.getElementById("toc-area").appendChild(div);
+}
+
+function date_math(){
+    const div = document.createElement("div");
+    const ym = new Date();
+    ym.setMonth(ym.getMonth()-1);
+    const year = ym.getFullYear();
+    const month = String(ym.getMonth() +1).padStart(2,"0");
+    div.innerHTML = `<label>日付</label><br>
+    <input type="text" id="year" value="${year}">
+                     <input type="text" id="month" value="${month}">`;
+    document.getElementById("getDate").appendChild(div);
+    document.getElementById("addDate").style.display="none";
+}
+
+function hasInvalidFilenameChars(name) {
+  // File System Access API で使えない文字
+  const invalidPattern = /[\\\/:*?"<>|\r\n\t]/;
+  return invalidPattern.test(name);
+}
+async function saveTemplate() {
+  let filename = document.getElementById("filename").value;
+
+  if (!filename && (!document.getElementById("year") && !document.getElementById("month"))) {
+    alert("ファイル名を入力してください");
+    return;
+  }
+
+  if (hasInvalidFilenameChars(filename)) {
+    alert('ファイル名に使用できない文字が含まれています。\n\\ / : * ? " < > | は使用できません。');
+    return;
+  }
+
+  if (!filename.endsWith(".txt")) filename += ".txt";
+
+  if (document.getElementById("year") && document.getElementById("month"))  {
+    const year = document.getElementById("year").value;
+    const month = document.getElementById("month").value;
+
+    const ym = `${year}${month}_`;
+    if (hasInvalidFilenameChars(ym)) {
+      alert("日付部分に使用できない文字が含まれています");
+      return;
+    }
+
+    filename = ym + filename;
+  }
+
+  const tocs = [...document.querySelectorAll('input[name="toc"]')]
+    .map(i => i.value)
+    .filter(v => v);
+
+  const content =
+`#filename
+${filename}
+
+#heading
+${tocs.join("\n")}`;
+
+  const handle = await dirHandle.getFileHandle(TEMPLATE_NAME, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(content);
+  await writable.close();
+
+  alert("テンプレートを作成しました");
+  showOutputScreen(content);
+}
+
+/* -----------------------------
+   テキスト出力画面
+----------------------------- */
+function showOutputScreen(text) {
+  const filename =
+  text.match(/#filename\n([\s\S]*?)\n\n/)[1].trim();
+
+  const tocText = text.match(/#heading\n([\s\S]*)/)[1];
+  const items = tocText.split("\n").filter(v => v);
+
+  let html = `<h2>出力ファイル：${filename}</h2>`;
+
+items.forEach(item => {
+  html += `
+  <div class="section">
+    <h3>${item}</h3>
+    <label>
+        <input type="checkbox"
+               class="subhead-check"
+               onchange="toggleSubhead(this)">
+               <span id="shomidashi">小見出しをつける</span>
+      </label>
+
+      <input type="text"
+             class="subhead-input"
+             placeholder="小見出し"
+             style="display:none;">
+
+
+      <textarea data-title="${item}"></textarea>
+    </div>
+  `;
+});
+
+  html += `<button onclick="saveOutput('${filename}')">保存</button>`;
+  document.getElementById("content").innerHTML = html;
+}
+
+function toggleSubhead(checkbox) {
+  const section = checkbox.closest(".section");
+  const input = section.querySelector(".subhead-input");
+
+  if (checkbox.checked) {
+    input.style.display = "inline-block";
+    input.focus();
+    document.getElementById("shomidashi").style.display="none";
+  } else {
+    input.style.display = "none";
+    input.value = ""; // OFF時は小見出し消す
+  }
+}
+
+async function saveOutput(filename) {
+  const textareas = document.querySelectorAll("textarea");
+  let output = "";
+
+textareas.forEach(ta => {
+  const section = ta.closest(".section");
+  const subhead = section.querySelector(".subhead-input").value;
+
+  output += `【${ta.dataset.title}】\n`;
+
+  if (subhead) {
+    output += `・${subhead}\n`;
+  }
+
+  const lines = ta.value.split("\n");
+lines.forEach(line => {
+  output += `    ${line}\n`;
+});
+output += "\n";
+
+});
+　
+  const handle = await dirHandle.getFileHandle(filename, { create: true });
+  const writable = await handle.createWritable();
+  await writable.write(output);
+  await writable.close();
+
+  alert("ファイルを出力しました");
+}
+</script>
+
+</body>
+</html>
