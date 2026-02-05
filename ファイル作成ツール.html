@@ -157,7 +157,7 @@ items.forEach(item => {
         <input type="checkbox"
                class="subhead-check"
                onchange="toggleSubhead(this)">
-               <span id="shomidashi">小見出しをつける</span>
+               <span class="subhead-label">小見出しをつける</span>
       </label>
 
       <input type="text"
@@ -176,16 +176,27 @@ items.forEach(item => {
 }
 
 function toggleSubhead(checkbox) {
+  // チェックボックスが属するセクション出ないなら処理を終了する
   const section = checkbox.closest(".section");
+  if(!section) return;
+
   const input = section.querySelector(".subhead-input");
+  const label = section.querySelector(".subhead-label");
+  if(!input) return;
 
   if (checkbox.checked) {
     input.style.display = "inline-block";
     input.focus();
-    document.getElementById("shomidashi").style.display="none";
+
+    // 操作しているセクションのラベルだけを消す
+    if(label) label.style.display = "none";
+
   } else {
     input.style.display = "none";
     input.value = ""; // OFF時は小見出し消す
+
+    // 操作しているセクションのラベルだけ戻す
+    if(label) label.style.display = "inline";
   }
 }
 
