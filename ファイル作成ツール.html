@@ -210,7 +210,7 @@ lines.forEach(line => {
 output += "\n";
 
 });
-　
+
   const handle = await dirHandle.getFileHandle(filename, { create: true });
   const writable = await handle.createWritable();
   await writable.write(output);
