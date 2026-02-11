@@ -82,10 +82,12 @@ function date_math(){
     const year = ym.getFullYear();
     const month = String(ym.getMonth() +1).padStart(2,"0");
     div.innerHTML = `<label>日付</label><br>
-    <input type="text" id="year" value="${year}">
-                     <input type="text" id="month" value="${month}">`;
+    <input type="text" maxlength="4" id="year" value="${year}">
+                     <input type="text" maxlength="2" id="month" value="${month}">`;
     document.getElementById("getDate").appendChild(div);
     document.getElementById("addDate").style.display="none";
+    document.getElementById("addDate").disabled=true;
+
 }
 
 function hasInvalidFilenameChars(name) {
@@ -111,6 +113,18 @@ async function saveTemplate() {
   if (document.getElementById("year") && document.getElementById("month"))  {
     const year = document.getElementById("year").value;
     const month = document.getElementById("month").value;
+
+    /* 2000~2100年代以内でなければ想定外とする */
+    if(year < 2000 || year >2100){
+      alert("年は2000~2100年内を入力してください。");
+      return;
+    }
+
+    /* 月が01~12内でなければエラー */
+    if(month < "01" || month > "12"){
+      alert("入力した月は存在しません。");
+      return;
+    }
 
     const ym = `${year}${month}_`;
     if (hasInvalidFilenameChars(ym)) {
