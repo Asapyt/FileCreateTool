@@ -23,8 +23,12 @@ const TEMPLATE_NAME = "template.txt";
 
 /* フォルダ選択 */
 document.getElementById("selectFolder").onclick = async () => {
-  dirHandle = await window.showDirectoryPicker();
-  checkTemplate();
+  try {
+    dirHandle = await window.showDirectoryPicker();
+    checkTemplate();
+  } catch (error) {
+    
+  }
 };
 
 /* テンプレート存在確認 */
