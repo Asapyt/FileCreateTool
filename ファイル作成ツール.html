@@ -5,9 +5,11 @@
 <title>テキスト出力ツール</title>
 <style>
   textarea {
-    width: 100%;
+     width: 500px;
+    max-width: 100%;
     height: 80px;
-    margin-bottom: 20px;
+    margin: 0 0 20px 0;   /* ← 左寄せ */
+    display: block;
   }
 </style>
 </head>
@@ -27,21 +29,47 @@ document.getElementById("selectFolder").onclick = async () => {
     dirHandle = await window.showDirectoryPicker();
     checkTemplate();
   } catch (error) {
+    alert('フォルダを選択してください。');
+    return false;
     
   }
 };
 
 /* テンプレート存在確認 */
 async function checkTemplate() {
+
   try {
+
     const handle = await dirHandle.getFileHandle(TEMPLATE_NAME);
     const file = await handle.getFile();
     const text = await file.text();
+
+    if (!text || text.trim() === "") {
+      throw new Error("empty template");
+    }
+
     showOutputScreen(text);
-  } catch {
+
+  } catch (error) {
+
+    /* -------------------------
+       ファイルが存在しないだけ
+       → 初回なのでエラー出さない
+    ------------------------- */
+    if (error.name === "NotFoundError") {
+      showTemplateCreator();
+      return;
+    }
+
+    /* -------------------------
+       それ以外は壊れている
+    ------------------------- */
+    alert("テンプレートファイル読み込み時にエラーが発生したため、再度作成してください。");
+
     showTemplateCreator();
   }
 }
+
 
 /* -----------------------------
    テンプレート作成画面
@@ -60,8 +88,12 @@ function showTemplateCreator() {
 
     <h3>目次</h3>
     <div id="toc-area">
-      <input type="text" name="toc" placeholder="目次">
+      <div>
+        <input type="text" name="toc" placeholder="目次">
+        <button type="button" onclick="removeToc(this)">削除</button>
+      </div>
     </div>
+
     <button onclick="addToc()">目次追加</button><br><br>
 
     <button onclick="saveTemplate()">テンプレート保存</button>
@@ -70,25 +102,59 @@ function showTemplateCreator() {
 }
 
 function addToc() {
+
+  const currentCount =
+    document.querySelectorAll('input[name="toc"]').length;
+
+  if (currentCount >= 10) {
+    alert("目次は10個まで追加できます。");
+    return;
+  }
+
   const div = document.createElement("div");
-  div.innerHTML = `<input type="text" name="toc" placeholder="目次">`;
+
+  div.innerHTML = `
+    <input type="text" name="toc" placeholder="目次">
+    <button type="button" onclick="removeToc(this)">削除</button>
+  `;
+
   document.getElementById("toc-area").appendChild(div);
 }
 
+function removeToc(button) {
+  const div = button.parentElement;
+  div.remove();
+}
+
 function date_math(){
+
+    const filenameInput = document.getElementById("filename");
+
+    // 既にyyyymm_が付いていなければ付ける
+    if (!filenameInput.value.startsWith("yyyymm_")) {
+        filenameInput.value = "yyyymm_" + filenameInput.value;
+    }
+
     const div = document.createElement("div");
+
     const ym = new Date();
     ym.setMonth(ym.getMonth()-1);
+
     const year = ym.getFullYear();
-    const month = String(ym.getMonth() +1).padStart(2,"0");
-    div.innerHTML = `<label>日付</label><br>
-    <input type="text" maxlength="4" id="year" value="${year}">
-                     <input type="text" maxlength="2" id="month" value="${month}">`;
+    const month = String(ym.getMonth()+1).padStart(2,"0");
+
+    div.innerHTML = `
+      <label>年月</label><br>
+      <input type="text" maxlength="4" id="year" value="${year}">
+      <input type="text" maxlength="2" id="month" value="${month}">
+    `;
+
     document.getElementById("getDate").appendChild(div);
+
     document.getElementById("addDate").style.display="none";
     document.getElementById("addDate").disabled=true;
-
 }
+
 
 function hasInvalidFilenameChars(name) {
   // File System Access API で使えない文字
@@ -110,34 +176,66 @@ async function saveTemplate() {
 
   if (!filename.endsWith(".txt")) filename += ".txt";
 
-  if (document.getElementById("year") && document.getElementById("month"))  {
-    const year = document.getElementById("year").value;
-    const month = document.getElementById("month").value;
+if (filename.startsWith("yyyymm_")) {
 
-    /* 2000~2100年代以内でなければ想定外とする */
-    if(year < 2000 || year >2100){
-      alert("年は2000~2100年内を入力してください。");
-      return;
+    const yearInput = document.getElementById("year");
+    const monthInput = document.getElementById("month");
+
+    if (!yearInput || !monthInput) {
+        alert("ファイル名が不正です。");
+        return;
     }
 
-    /* 月が01~12内でなければエラー */
-    if(month < "01" || month > "12"){
-      alert("入力した月は存在しません。");
-      return;
+    const year = yearInput.value;
+    const month = monthInput.value.padStart(2,"0");
+
+    if (!/^\d{4}$/.test(year) || year < 2000 || year > 2100) {
+        alert("ファイル名が不正です。");
+        return;
     }
 
-    const ym = `${year}${month}_`;
-    if (hasInvalidFilenameChars(ym)) {
-      alert("日付部分に使用できない文字が含まれています");
-      return;
+    if (!/^\d{2}$/.test(month) || month < "01" || month > "12") {
+        alert("ファイル名が不正です。");
+        return;
     }
 
-    filename = ym + filename;
+    const realYM = `${year}${month}_`;
+    filename = filename.replace("yyyymm_", realYM);
+}
+
+// ① 取得
+const tocInputs = [...document.querySelectorAll('input[name="toc"]')];
+
+/* ② 空欄削除 */
+tocInputs.forEach(input => {
+  if (!input.value.trim()) {
+    input.parentElement.remove();
   }
+});
 
-  const tocs = [...document.querySelectorAll('input[name="toc"]')]
-    .map(i => i.value)
-    .filter(v => v);
+// ③ 削除後に再取得（別変数にする）
+const cleanedTocInputs =
+  [...document.querySelectorAll('input[name="toc"]')];
+
+const tocs = cleanedTocInputs.map(i => i.value.trim());
+
+// ④ 0件チェック
+if (tocs.length === 0) {
+  alert("目次を1つ以上入力してください。");
+  return;
+}
+
+// ⑤ 重複チェック
+const unique = new Set(tocs);
+
+if (unique.size !== tocs.length) {
+  const confirmResult =
+    confirm("目次に重複があります。このまま保存しますか？");
+
+  if (!confirmResult) {
+    return;
+  }
+}
 
   const content =
 `#filename
@@ -159,39 +257,77 @@ ${tocs.join("\n")}`;
    テキスト出力画面
 ----------------------------- */
 function showOutputScreen(text) {
-  const filename =
-  text.match(/#filename\n([\s\S]*?)\n\n/)[1].trim();
 
-  const tocText = text.match(/#heading\n([\s\S]*)/)[1];
-  const items = tocText.split("\n").filter(v => v);
+  try {
 
-  let html = `<h2>出力ファイル：${filename}</h2>`;
+    /* --------------------------
+       #filename 取得
+    --------------------------- */
+    const filenameMatch = text.match(/#filename\n([\s\S]*?)\n\n/);
+    if (!filenameMatch) {
+      throw new Error("filename not found");
+    }
 
-items.forEach(item => {
-  html += `
-  <div class="section">
-    <h3>${item}</h3>
-    <label>
-        <input type="checkbox"
-               class="subhead-check"
-               onchange="toggleSubhead(this)">
-               <span class="subhead-label">小見出しをつける</span>
-      </label>
+    const filename = filenameMatch[1].trim();
 
-      <input type="text"
-             class="subhead-input"
-             placeholder="小見出し"
-             style="display:none;">
+    if (!isValidFilename(filename)) {
+      throw new Error("invalid filename");
+    }
 
+    /* --------------------------
+       #heading 取得
+    --------------------------- */
+    const headingMatch = text.match(/#heading\n([\s\S]*)/);
+    if (!headingMatch) {
+      throw new Error("heading not found");
+    }
 
-      <textarea data-title="${item}"></textarea>
-    </div>
-  `;
-});
+    const tocText = headingMatch[1];
+    const items = tocText.split("\n").filter(v => v);
 
-  html += `<button onclick="saveOutput('${filename}')">保存</button>`;
-  document.getElementById("content").innerHTML = html;
+    if (items.length === 0) {
+      throw new Error("no headings");
+    }
+
+    /* --------------------------
+       画面生成
+    --------------------------- */
+
+    let html = `<h2>出力ファイル：${filename}</h2>`;
+
+    items.forEach(item => {
+      html += `
+        <div class="section">
+          <h3>${item}</h3>
+
+          <label>
+            <input type="checkbox"
+                   class="subhead-check"
+                   onchange="toggleSubhead(this)">
+            <span class="subhead-label">小見出しをつける</span>
+          </label>
+
+          <input type="text"
+                 class="subhead-input"
+                 placeholder="小見出し"
+                 style="display:none;">
+
+          <textarea data-title="${item}"></textarea>
+        </div>
+      `;
+    });
+
+    html += `<button onclick="saveOutput('${filename}')">保存</button>`;
+    document.getElementById("content").innerHTML = html;
+
+  } catch (error) {
+
+    alert("テンプレートファイル読み込み時にエラーが発生したため、再度作成してください。");
+
+    showTemplateCreator();
+  }
 }
+
 
 function toggleSubhead(checkbox) {
   // チェックボックスが属するセクション出ないなら処理を終了する
@@ -219,6 +355,12 @@ function toggleSubhead(checkbox) {
 }
 
 async function saveOutput(filename) {
+
+  if (!isValidFilename(filename)) {
+      alert("ファイル名が不正です。");
+      return;
+  }
+  
   const textareas = document.querySelectorAll("textarea");
   let output = "";
 
@@ -247,6 +389,19 @@ output += "\n";
 
   alert("ファイルを出力しました");
 }
+
+//ファイル名チェック
+function isValidFilename(name) {
+
+  if (!name) return false;
+
+  if (hasInvalidFilenameChars(name)) return false;
+
+  if (!name.endsWith(".txt")) return false;
+
+  return true;
+}
+
 </script>
 
 </body>
