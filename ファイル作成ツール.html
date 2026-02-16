@@ -75,6 +75,7 @@ async function checkTemplate() {
    テンプレート作成画面
 ----------------------------- */
 function showTemplateCreator() {
+
   document.getElementById("content").innerHTML = `
     <h2>テンプレート作成</h2>
 
@@ -83,22 +84,45 @@ function showTemplateCreator() {
     </label><br>
 
     <label id="getDate">
-      <input type="button" id="addDate" onclick="date_math()" value="月日を先頭に付ける">
+      <input type="button" id="addDate" value="月日を先頭に付ける">
     </label><br><br>
 
     <h3>目次</h3>
     <div id="toc-area">
       <div>
         <input type="text" name="toc" placeholder="目次">
-        <button type="button" onclick="removeToc(this)">削除</button>
+        <button type="button" class="remove-toc">削除</button>
       </div>
     </div>
 
-    <button onclick="addToc()">目次追加</button><br><br>
-
-    <button onclick="saveTemplate()">テンプレート保存</button>
+    <button id="addTocBtn">目次追加</button><br><br>
+    <button id="saveTemplateBtn">テンプレート保存</button>
   `;
+
   document.getElementById("selectFolder").style.display="none";
+
+  /* -----------------------------
+     ここでイベント登録
+  ----------------------------- */
+
+  document
+    .getElementById("addDate")
+    .addEventListener("click", date_math);
+
+  document
+    .getElementById("addTocBtn")
+    .addEventListener("click", addToc);
+
+  document
+    .getElementById("saveTemplateBtn")
+    .addEventListener("click", saveTemplate);
+
+  /* 削除ボタン（最初の1個） */
+  document
+    .querySelector(".remove-toc")
+    .addEventListener("click", function() {
+      this.parentElement.remove();
+    });
 }
 
 function addToc() {
@@ -115,11 +139,18 @@ function addToc() {
 
   div.innerHTML = `
     <input type="text" name="toc" placeholder="目次">
-    <button type="button" onclick="removeToc(this)">削除</button>
+    <button type="button" class="remove-toc">削除</button>
   `;
 
   document.getElementById("toc-area").appendChild(div);
+
+  /* 追加した削除ボタンにイベント登録 */
+  div.querySelector(".remove-toc")
+     .addEventListener("click", function() {
+        div.remove();
+     });
 }
+
 
 function removeToc(button) {
   const div = button.parentElement;
